@@ -1,0 +1,240 @@
+import React, { useState } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { getProjectIdFromSlug } from "@/lib/utils";
+import {
+  Eye,
+  Upload,
+  Layers,
+  Crosshair,
+  AlignCenter,
+  Camera,
+  BarChart2,
+} from "lucide-react";
+
+const TOOLS = [
+  { id: "upload", icon: Upload, label: "Upload Files" },
+  { id: "models", icon: Layers, label: "Models" },
+  { id: "picking", icon: Crosshair, label: "Picking", adminOnly: true },
+  { id: "alignment", icon: AlignCenter, label: "Alignment", adminOnly: true },
+  { id: "cameras", icon: Camera, label: "Cameras" },
+];
+
+export default function IconToolbar({
+  activePanel,
+  onSelectPanel,
+  role,
+  projectSlug: projectSlugProp,
+}) {
+  const [hovered, setHovered] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Viewer/Analytics/Progress are rendered by PersistentWorkspace (not as a
+  // matched <Route>), so useParams() alone no longer resolves the slug — the
+  // page passes it down explicitly. Keep the useParams() fallback in case
+  // this is ever rendered directly by a matched <Route>.
+  const params = useParams();
+  const projectSlug = projectSlugProp ?? (params.projectSlug || params.slug);
+  const projectId = getProjectIdFromSlug(projectSlug);
+
+  const isViewer = role === "viewer";
+  const isAnalytics = location.pathname.startsWith("/analytics");
+  const isViewerPage = location.pathname.startsWith("/viewer");
+  const items = TOOLS.filter((t) => !t.adminOnly || !isViewer);
+
+  const NAV_ITEMS = [
+    { id: "analytics", icon: BarChart2, label: "Analytics" },
+  ];
+
+  const handleNavClick = (item) => {
+    if (item.id === "analytics") {
+      if (isAnalytics) {
+        navigate(projectSlug ? `/viewer/${projectSlug}` : -1);
+      } else {
+        navigate(projectSlug ? `/analytics/${projectSlug}` : "/analytics/");
+      }
+    } else {
+      navigate(item.path);
+    }
+  };
+
+// Eye button: opens this project's viewer page (/viewer/<projectSlug>).
+  // Clicking again while already on the viewer page closes it — i.e. goes
+  // back to whatever page was open before the viewer.
+  const handleViewerClick = () => {
+    if (isViewerPage) {
+      navigate(-1);
+    } else {
+      navigate(projectSlug ? `/viewer/${projectSlug}` : -1);
+    }
+  };
+
+  const renderButton = ({ id, icon: Icon, label, isNav, navItem }) => {
+    // Panel tools are active when their panel is open.
+    // The Analytics nav item is active while the Analytics page is open.
+    const isActive = isNav
+      ? id === "analytics" && isAnalytics
+      : activePanel === id;
+    const isHovered = hovered === id;
+
+    const handleClick = () => {
+      if (isNav) handleNavClick(navItem);
+      else onSelectPanel(isActive ? null : id);
+    };
+
+    return (
+      <div
+        key={id}
+        style={{ position: "relative", width: "100%" }}
+        onMouseEnter={() => setHovered(id)}
+        onMouseLeave={() => setHovered(null)}
+      >
+        {/* Active left-edge indicator */}
+        {isActive && (
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 2,
+              height: 18,
+              background: "#3b82f6",
+              borderRadius: "0 2px 2px 0",
+            }}
+          />
+        )}
+
+        <button
+          onClick={handleClick}
+          title={label}
+          style={{
+            width: "100%",
+            height: 40,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: isActive
+              ? "rgba(59,130,246,0.07)"
+              : isHovered
+                ? "rgba(0,0,0,0.03)"
+                : "transparent",
+            border: "none",
+            cursor: "pointer",
+            color: isActive ? "#3b82f6" : isHovered ? "#4b5563" : "#c4cad4",
+            transition: "color 0.12s ease, background 0.12s ease",
+            padding: 0,
+            borderRadius: 0,
+          }}
+        >
+          <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} />
+        </button>
+
+        {/* Tooltip */}
+        {isHovered && (
+          <div
+            style={{
+              position: "absolute",
+              left: 50,
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "#1f2937",
+              color: "#f9fafb",
+              padding: "4px 10px",
+              borderRadius: 5,
+              fontSize: 11,
+              fontWeight: 500,
+              whiteSpace: "nowrap",
+              zIndex: 200,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
+              pointerEvents: "none",
+              letterSpacing: "0.01em",
+            }}
+          >
+            {id === "analytics"
+              ? isAnalytics
+                ? "Close Analytics"
+                : "Open Analytics"
+              : label}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      style={{
+        width: 44,
+        flexShrink: 0,
+        height: "100%",
+        background: "#ffffff",
+        borderRight: "1px solid #e5e7eb",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        paddingTop: 6,
+        paddingBottom: 6,
+        gap: 1,
+      }}
+    >
+      {/* Eye button — opens/closes the viewer page for the current project,
+          rendered as a plain click button (no toggle icon-swap), same style
+          as every other icon below it. */}
+      <div
+        style={{ position: "relative", width: "100%" }}
+        onMouseEnter={() => setHovered("viewer")}
+        onMouseLeave={() => setHovered(null)}
+      >
+        <button
+          onClick={handleViewerClick}
+          title="Viewer"
+          style={{
+            width: "100%",
+            height: 40,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background:
+              hovered === "viewer" ? "rgba(0,0,0,0.03)" : "transparent",
+            border: "none",
+            cursor: "pointer",
+            color: hovered === "viewer" ? "#4B5563" : "#C4CAD4",
+            transition: "color 0.12s ease, background 0.12s ease",
+            padding: 0,
+            borderRadius: 0,
+          }}
+        >
+          <Eye size={16} strokeWidth={1.8} />
+        </button>
+
+        {hovered === "viewer" && (
+          <div
+            style={{
+              position: "absolute",
+              left: 50,
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "#1F2937",
+              color: "#F9FAFB",
+              padding: "4px 10px",
+              borderRadius: 5,
+              fontSize: 11,
+              fontWeight: 500,
+              whiteSpace: "nowrap",
+              zIndex: 200,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.18)",
+              pointerEvents: "none",
+              letterSpacing: "0.01em",
+            }}
+          >
+            {isViewerPage ? "Close Viewer" : "Open Viewer"}
+          </div>
+        )}
+      </div>
+      {items.map((item) => renderButton({ ...item, isNav: false }))}
+      {NAV_ITEMS.map((item) =>
+        renderButton({ ...item, isNav: true, navItem: item }),
+      )}
+    </div>
+  );
+}
